@@ -15,7 +15,7 @@ def clean_gutenberg_text(file_path):
     text = re.split(footer_pattern, text, flags=re.IGNORECASE)[0]  # Keep only content before footer
 
     # Remove punctuation
-    text = text.translate(str.maketrans('', '', string.punctuation + string.digits + "”" + "“"))
+    text = text.translate(str.maketrans('', '', string.punctuation + string.digits + "”" + "“" + "—”" + "‘"))
 
     # Remove single-character words except 'i'
     text = re.sub(r'\b(?!i\b)\w\b', '', text, flags=re.IGNORECASE)

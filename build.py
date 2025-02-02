@@ -11,6 +11,10 @@ import json
 from cleaner import clean_gutenberg_text
 import os
 
+# Detect device (Apple Silicon, Nvidia GPU, or CPU fallback)
+device = torch.device("mps" if torch.backends.mps.is_available() else "cuda" if torch.cuda.is_available() else "cpu")
+print(f"Using device: {device}")
+
 
 class PositionalEncoding(nn.Module):
     def __init__(self, d_model, max_len=5000):
@@ -50,13 +54,13 @@ class TransformerBlock(nn.Module):
 class TransformerLanguageModel(nn.Module):
     def __init__(self, vocab_size, d_model=128, num_heads=4, num_layers=2, d_ff=256, max_len=100, dropout=0.1):
         super().__init__()
-        self.embedding = nn.Embedding(vocab_size, d_model)
-        self.pos_encoding = PositionalEncoding(d_model, max_len)
-        self.layers = nn.ModuleList([TransformerBlock(d_model, num_heads, d_ff, dropout) for _ in range(num_layers)])
-        self.fc_out = nn.Linear(d_model, vocab_size)
+        self.embedding = nn.Embedding(vocab_size, d_model).to(device)
+        self.pos_encoding = PositionalEncoding(d_model, max_len).to(device)
+        self.layers = nn.ModuleList([TransformerBlock(d_model, num_heads, d_ff, dropout).to(device) for _ in range(num_layers)])
+        self.fc_out = nn.Linear(d_model, vocab_size).to(device)
 
     def forward(self, x, attn_mask=None):
-        x = self.embedding(x)
+        x = self.embedding(x)  # No need to move again, already on `device`
         x = self.pos_encoding(x)
         for layer in self.layers:
             x = layer(x, attn_mask)
@@ -107,13 +111,13 @@ def train(model, dataloader, optimizer, criterion, epochs=10):
         total_loss = 0
         for x, y in dataloader:
             optimizer.zero_grad()
-            x, y = x.permute(1, 0), y.permute(1, 0)
+            x, y = x.to(device).permute(1, 0), y.to(device).permute(1, 0)
             output = model(x)
             loss = criterion(output.reshape(-1, vocab_size), y.reshape(-1))
             loss.backward()
             optimizer.step()
             total_loss += loss.item()
-        print(f"Epoch {epoch + 1}, Loss: {total_loss / len(dataloader):.4f}")
+        print(f"Epoch {epoch+1}, Loss: {total_loss/len(dataloader):.4f}")
 
 
 # Train the model
@@ -149,8 +153,8 @@ with open("vocab.json", "r") as f:
     vocab = json.load(f)
 inv_vocab = {idx: word for word, idx in vocab.items()}
 
-model = TransformerLanguageModel(len(vocab))
-model.load_state_dict(torch.load("transformer_model.pth"))
+model = TransformerLanguageModel(len(vocab)).to(device)
+model.load_state_dict(torch.load("transformer_model.pth", map_location=device))
 model.eval()
 
 # Example query

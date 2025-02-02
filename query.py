@@ -3,6 +3,10 @@ import torch.nn as nn
 import math
 import json
 
+# Detect device (Apple Silicon, Nvidia GPU, or CPU fallback)
+device = torch.device("mps" if torch.backends.mps.is_available() else "cuda" if torch.cuda.is_available() else "cpu")
+print(f"Using device: {device}")
+
 
 class PositionalEncoding(nn.Module):
     def __init__(self, d_model, max_len=5000):
@@ -79,7 +83,7 @@ with open("vocab.json", "r") as f:
 inv_vocab = {idx: word for word, idx in vocab.items()}
 
 model = TransformerLanguageModel(len(vocab))
-model.load_state_dict(torch.load("transformer_model.pth"))
+model.load_state_dict(torch.load("transformer_model.pth", map_location=device))
 model.eval()
 
 generated_text = generate_text(model, "Institutional sabotage", vocab, inv_vocab, max_length=20, temperature=2.8)
